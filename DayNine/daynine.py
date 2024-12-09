@@ -1,103 +1,109 @@
 # Advent of Code Day #9
-spaceArray = []
-isSpace = False
-count = 0
 
-# Read the input (a single very long line) and convert it into blocks
-# Even indices -> file block counts, Odd indices -> free space counts
-with open("data.txt", "r") as file:
-    for line in file:
-        for num in line.strip():
-            if isSpace:
-                # Add '.' for free spaces
-                for _ in range(int(num)):
-                    spaceArray.append('.')
-                isSpace = False
+def parse_disk(line: str):
+    # Parse the input line into a disk array
+    # Alternating runs: file-length, space-length, file-length, space-length, ...
+    disk = []
+    is_space = False
+    file_id = 0
+    i = 0
+    while i < len(line):
+        length = int(line[i])
+        i += 1
+        if length > 0:
+            if is_space:
+                # Append free spaces
+                disk.extend(['.'] * length)
+                is_space = False
             else:
-                # Add block IDs for files
-                for _ in range(int(num)):
-                    spaceArray.append(count)
-                count += 1
-                isSpace = True
+                # Append file blocks with current file_id
+                disk.extend([str(file_id)] * length)
+                file_id += 1
+                is_space = True
+        else:
+            # A run of length zero means skip? Problem states runs alternate,
+            # a '0' means a run of size zero. We just flip space/file?
+            # According to problem: a digit 0 means run length zero of that type.
+            # Just flip is_space and continue
+            is_space = not is_space
 
-# The approach:
-# 1. Identify the rightmost block.
-# 2. Try to place it into the earliest large enough free space on the left.
-# 3. If placed, remove it from the right and insert it on the left.
-# 4. If no suitable free space is found, leave the block in place and move on.
-# 5. Repeat until no changes occur.
+    return disk, file_id - 1  # file_id - 1 is the highest file id assigned
 
-while True:
-    moved = False
-    # We'll scan from the right to left for blocks
-    left = 0
-    right = len(spaceArray) - 1
+def find_file(disk, fid):
+    # Find the continuous run of file blocks with ID=fid (as string)
+    fid_str = str(fid)
+    start = None
+    end = None
+    for idx, val in enumerate(disk):
+        if val == fid_str:
+            if start is None:
+                start = idx
+            end = idx
+    return start, end
 
-    # Move through all blocks from right to left in one full pass
-    while left < right:
-        # Find the rightmost block (skip trailing '.')
-        while right > left and right >= 0 and spaceArray[right] == '.':
-            right -= 1
-        if left >= right:
-            # No more blocks to move
-            break
+def find_free_space(disk, required_length, limit_index):
+    # Find a leftmost free space run to the LEFT of limit_index that can hold required_length
+    # limit_index is the start of the file, we look for space runs strictly before it
+    best_start = None
+    i = 0
+    while i < limit_index:
+        if disk[i] == '.':
+            run_start = i
+            # Measure free space run
+            while i < limit_index and i < len(disk) and disk[i] == '.':
+                i += 1
+            run_length = i - run_start
+            if run_length >= required_length:
+                # Return immediately the first suitable free space
+                return run_start
+        else:
+            i += 1
+    return best_start
 
-        currentValue = spaceArray[right]
-        # Determine the size of this block
-        sizeOfBlock = 0
-        blockEnd = right
-        while blockEnd >= 0 and spaceArray[blockEnd] == currentValue:
-            sizeOfBlock += 1
-            blockEnd -= 1
+def move_file(disk, file_id):
+    # Move the file with ID=file_id according to the rules
+    start, end = find_file(disk, file_id)
+    if start is None:
+        # File not found (maybe zero-length?), do nothing
+        return
+    file_length = (end - start + 1)
 
-        # Attempt to place the block in a suitable free space
-        blockPlaced = False
-        # Start scanning free spaces from the very beginning each time
-        freeScan = 0
-        while freeScan < right and not blockPlaced:
-            if spaceArray[freeScan] == '.':
-                # Measure size of this free space run
-                sizeOfSpace = 0
-                freeScanDummy = freeScan
-                while freeScanDummy < len(spaceArray) and spaceArray[freeScanDummy] == '.':
-                    sizeOfSpace += 1
-                    freeScanDummy += 1
+    # Find a suitable free space to the left
+    free_start = find_free_space(disk, file_length, start)
+    if free_start is not None:
+        # Move the file there
+        fid_str = str(file_id)
+        # Clear old position
+        for i in range(start, end+1):
+            disk[i] = '.'
+        # Place file in free space
+        for i in range(file_length):
+            disk[free_start + i] = fid_str
 
-                if sizeOfSpace >= sizeOfBlock:
-                    # The block fits here
-                    # Remove the block from the right side
-                    for i in range(sizeOfBlock):
-                        spaceArray[right - i] = '.'
-                    # Place the block on the left side free space
-                    for i in range(sizeOfBlock):
-                        spaceArray[freeScan + i] = currentValue
+def compute_checksum(disk):
+    checksum = 0
+    for i, val in enumerate(disk):
+        if val != '.':
+            checksum += int(val)*i
+    return checksum
 
-                    # Update pointers: The block is now placed
-                    # Move right pointer to the end of the previous block
-                    right = blockEnd
-                    moved = True
-                    blockPlaced = True
-                else:
-                    # Doesn't fit, skip this space run
-                    freeScan = freeScanDummy
-            else:
-                freeScan += 1
 
-        if not blockPlaced:
-            # Couldn't place the block anywhere, leave it where it is.
-            # Move on to the next block to the left
-            right = blockEnd
+# ---------------------
+# Main execution logic
+# ---------------------
 
-    # If in this full pass we haven't moved any block, we are done
-    if not moved:
-        break
+# If your input is in a file named "data.txt", use the code below.
+# Otherwise, you can store the huge line in a variable `input_data` and pass it directly.
 
-# Compute the checksum
-checkSum = 0
-for index, num in enumerate(spaceArray):
-    if num != '.':
-        checkSum += int(num) * index
+with open("data.txt", "r") as f:
+    input_data = f.read().strip()
 
-print(spaceArray)
-print(checkSum)
+disk, max_file_id = parse_disk(input_data)
+
+# Move each file once in order of decreasing file ID number
+for fid in range(max_file_id, -1, -1):
+    move_file(disk, fid)
+
+cs = compute_checksum(disk)
+print(cs)
 
