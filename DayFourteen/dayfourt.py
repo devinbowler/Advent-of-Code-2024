@@ -1,6 +1,7 @@
 # Advent of Code Day 14
 import re
 import copy
+import time
 
 def partOne():
     robotPaths = []
@@ -48,6 +49,8 @@ def partOne():
                     countQ4 += 1 
                 else: 
                     pass
+        for line in hqRoom:
+            print(line)
 
 
         
@@ -61,11 +64,66 @@ def partOne():
 
 
 
-
-
-
-
 def partTwo():
-    pass
+    # Parse the input from the file
+    with open('data.txt', 'r') as f:
+        r_inp = f.read()
 
-partOne()
+    robots = []
+
+    # Parse each line of the input
+    for l in r_inp.strip().split("\n"):
+        if not l: 
+            continue
+        # Extract position and velocity
+        problem = []
+        eq_split = l.split("=")
+    
+        p_split = eq_split[1].split(",")
+        problem.append(int(p_split[0].strip()))
+        problem.append(int(p_split[1].split(" ")[0].strip()))
+    
+        v_split = eq_split[2].split(",")
+        problem.append(int(v_split[0].strip()))
+        problem.append(int(v_split[1].strip()))
+    
+        robots.append(tuple(problem))
+
+    # Loop through the range of t seconds (this could be up to 10,000)
+    for t in range(10000):
+        # Step 1: Find robots close to each other
+        next_set = set()
+        matching = set()
+    
+        for px, py, vx, vy in robots:
+            # Calculate position after `t` seconds with wrapping
+            xf, yf = (px + t * vx) % 101, (py + t * vy) % 103
+        
+            # If this position is already in the set, add it to matching
+            if (xf, yf) in next_set:
+                matching.add((xf, yf))
+        
+            # Add all neighboring positions to the set (3x3 grid around it)
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    next_set.add((xf + dx, yf + dy))
+    
+        # Step 2: Print the board if there are enough matching robots
+        if len(matching) > 250:
+            print(f"\nTime = {t} seconds - Robots in a cluster: {len(matching)}\n")
+        
+            # Print the 2D grid (up to a 100x100 area)
+            for y in range(50):  # Print first 50 rows only for visibility
+                for x in range(101):  # Print all 101 columns
+                    if (x, y) in matching:
+                        print("*", end="")
+                    else:
+                        print(".", end="")
+                print("")
+        
+            print(f"t: {t}")
+            break  # Exit after printing the grid (remove this if you want it to run until 10,000)
+
+
+partTwo()
+# partOne()
